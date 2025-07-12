@@ -133,29 +133,82 @@ def crawl_naver_cafes_by_dong(dong_name, max_count=10):
                     driver.switch_to.frame(entry_iframe)
                     time.sleep(3)
                     try:
-                        addr_elems = WebDriverWait(driver, 10).until(
-                            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "span.LDgIH, div.LDgIH"))
-                        )
-                        print(f"[{name}] 주소 후보 개수: {len(addr_elems)}")
-                        for elem in addr_elems:
-                            print(f"[{name}] 주소 후보: {elem.text}")
-                        addr = max((elem.text.strip() for elem in addr_elems), key=len, default="")
-                        print(f"[{name}] 주소 최종 선택: {addr}")
+                        # 다양한 주소 선택자 시도
+                        addr_selectors = [
+                            "span.LDgIH, div.LDgIH",
+                            "span.address, div.address",
+                            "span[class*='address']",
+                            "div[class*='address']",
+                            "span[class*='addr']",
+                            "div[class*='addr']",
+                            "span[class*='location']",
+                            "div[class*='location']",
+                            "span[class*='place']",
+                            "div[class*='place']"
+                        ]
+                        
+                        addr_elems = []
+                        for selector in addr_selectors:
+                            try:
+                                addr_elems = driver.find_elements(By.CSS_SELECTOR, selector)
+                                if addr_elems:
+                                    print(f"[{name}] 주소 선택자 성공: {selector}")
+                                    break
+                            except:
+                                continue
+                        
+                        if addr_elems:
+                            print(f"[{name}] 주소 후보 개수: {len(addr_elems)}")
+                            for elem in addr_elems:
+                                print(f"[{name}] 주소 후보: {elem.text}")
+                            addr = max((elem.text.strip() for elem in addr_elems), key=len, default="")
+                            print(f"[{name}] 주소 최종 선택: {addr}")
+                        else:
+                            print(f"[{name}] 주소 요소를 찾을 수 없음")
+                            addr = ""
                     except Exception as e:
                         print(f"[{name}] 주소 추출 실패(iframe): {e}")
+                        addr = ""
                 except Exception as e:
                     print(f"[{name}] entryIframe 진입 실패: {e}")
                     # iframe이 없으면 default_content에서 주소 시도
                     try:
                         time.sleep(3)
-                        addr_elems = WebDriverWait(driver, 5).until(
-                            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "span.LDgIH, div.LDgIH"))
-                        )
-                        print(f"[{name}] 주소 후보 개수(메인): {len(addr_elems)}")
-                        for elem in addr_elems:
-                            print(f"[{name}] 주소 후보(메인): {elem.text}")
-                        addr = max((elem.text.strip() for elem in addr_elems), key=len, default="")
-                        print(f"[{name}] 주소 최종 선택(메인): {addr}")
+                        # 다양한 주소 선택자 시도 (메인 페이지)
+                        addr_selectors_main = [
+                            "span.LDgIH, div.LDgIH",
+                            "span.address, div.address",
+                            "span[class*='address']",
+                            "div[class*='address']",
+                            "span[class*='addr']",
+                            "div[class*='addr']",
+                            "span[class*='location']",
+                            "div[class*='location']",
+                            "span[class*='place']",
+                            "div[class*='place']",
+                            "span[class*='info']",
+                            "div[class*='info']"
+                        ]
+                        
+                        addr_elems = []
+                        for selector in addr_selectors_main:
+                            try:
+                                addr_elems = driver.find_elements(By.CSS_SELECTOR, selector)
+                                if addr_elems:
+                                    print(f"[{name}] 주소 선택자 성공(메인): {selector}")
+                                    break
+                            except:
+                                continue
+                        
+                        if addr_elems:
+                            print(f"[{name}] 주소 후보 개수(메인): {len(addr_elems)}")
+                            for elem in addr_elems:
+                                print(f"[{name}] 주소 후보(메인): {elem.text}")
+                            addr = max((elem.text.strip() for elem in addr_elems), key=len, default="")
+                            print(f"[{name}] 주소 최종 선택(메인): {addr}")
+                        else:
+                            print(f"[{name}] 주소 요소를 찾을 수 없음(메인)")
+                            addr = ""
                     except Exception as e2:
                         print(f"[{name}] 주소 추출 실패(메인): {e2}")
                         addr = ""
@@ -230,33 +283,44 @@ def crawl_naver_cafes_by_dong(dong_name, max_count=10):
 
 if __name__ == "__main__":
     print("\n[네이버 지도 카페 수집기]")
-    print("동 이름(예: 망원동, 합정동, 신촌동 등) 또는 'exit' 입력 시 종료")
-    while True:
-        dong_name = input("\n수집할 동 이름을 입력하세요: ").strip()
-        if dong_name.lower() in ["exit", "quit", "q", "종료"]:
-            print("프로그램을 종료합니다.")
-            break
-        if not dong_name:
-            print("동 이름을 입력해주세요.")
-            continue
-        try:
-            max_count = input("수집할 최대 카페 수(기본 10): ").strip()
-            max_count = int(max_count) if max_count.isdigit() else 10
-            print(f"\n[{dong_name}] 카페 정보 수집 중...")
-            results = crawl_naver_cafes_by_dong(dong_name, max_count=max_count)
-            if results:
-                df = pd.DataFrame(results)
-                print(f"\n[{dong_name}] 카페 리스트 (총 {len(df)}개):")
-                print(df[['name', 'address', 'rating', 'review_count']].to_string(index=False))
-                # 파일 저장: dong 컬럼 제외
-                save_cols = [col for col in df.columns if col != 'dong']
-                filename = f"{dong_name}_카페리스트.csv"
-                df[save_cols].to_csv(filename, index=False, encoding='utf-8-sig')
-                print(f"\n파일로 저장 완료: {filename}")
-            else:
-                print(f"[{dong_name}]에서 카페를 찾지 못했습니다.")
-        except Exception as e:
-            print(f"오류 발생: {e}")
+    print("동 이름을 입력하면 카페를 검색, 수집합니다.")
+    
+    # 동 이름 입력받기
+    dong_name = input("\n수집할 지역 이름을 입력하세요(동 단위): ").strip()
+
+    if dong_name.lower() in ["exit", "quit", "q", "종료"]:
+        print("프로그램을 종료합니다.")
+        exit()
+
+    if not dong_name:
+        print("동 단위로 입력해주세요.")
+        exit()
+    
+    # 카페 수 입력받기
+    max_count_input = input("수집할 카페 수를 입력하세요: ").strip()
+    if not max_count_input.isdigit():
+        print("숫자를 입력해주세요.")
+        exit()
+    max_count = int(max_count_input)
+
+    print(f"\n[{dong_name}] 카페 정보 수집 중...")
+    try:
+        results = crawl_naver_cafes_by_dong(dong_name, max_count=max_count)
+        if results:
+            df = pd.DataFrame(results)
+            print(f"\n[{dong_name}] 카페 리스트 (총 {len(df)}개):")
+            print(df[['name', 'address', 'rating', 'review_count']].to_string(index=False))
+            # 파일 저장: dong 컬럼 제외
+            save_cols = [col for col in df.columns if col != 'dong']
+            filename = f"{dong_name}_카페리스트.csv"
+            df[save_cols].to_csv(filename, index=False, encoding='utf-8-sig')
+            print(f"\n파일로 저장 완료: {filename}")
+        else:
+            print(f"[{dong_name}]에서 카페를 찾지 못했습니다.")
+    except Exception as e:
+        print(f"오류 발생: {e}")
+    
+    print("\n수집이 완료되었습니다.")
 
 
 # 예시 코드
