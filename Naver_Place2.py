@@ -97,6 +97,9 @@ def crawl_naver_cafes_by_dong(dong_name, max_count=10):
             if count >= max_count:
                 break
             try:
+                # 항상 search_iframe으로 전환
+                driver.switch_to.default_content()
+                driver.switch_to.frame(search_iframe)
                 # 이름 추출
                 name = extract_name(place)
                 if not name or name in processed_names:
@@ -105,20 +108,17 @@ def crawl_naver_cafes_by_dong(dong_name, max_count=10):
                 clicked = click_place_card(driver, place, name)
                 if not clicked:
                     continue
+                # 상세페이지(iframe)에서 평점/리뷰 추출
+                rating, visitor_review, blog_review = get_detail_rating_review(driver, name)
                 # entryIframe 또는 메인에서 주소 추출 (extract_address 함수 사용)
                 addr = get_place_address(driver, name)
-                # 평점
-                rating = extract_rating(place)
-                # 리뷰 수
-                review = extract_review_count(place)
-                if review == "0":
-                    continue
                 results.append({
                     "dong": dong_name,
                     "name": name,
                     "address": addr,
                     "rating": rating,
-                    "review_count": review
+                    "visitor_review": visitor_review,
+                    "blog_review": blog_review
                 })
                 processed_names.add(name)
                 count += 1
@@ -165,6 +165,8 @@ def click_place_card(driver, place, name=None):
             if name:
                 print(f"[{name}] 상세페이지 클릭 성공 ({click_sel})")
             time.sleep(3)
+            # 항상 최상위로 전환
+            driver.switch_to.default_content()
             return True
         except Exception as e:
             if name:
@@ -247,6 +249,7 @@ def extract_address(driver, selectors, name=None):
         except:
             continue
     all_texts = [elem.text.strip() for elem in addr_elems if elem.text.strip()]
+    print(f"[{name}] 주소 후보 텍스트: {all_texts}")
     address_keywords = ['구', '로', '길', '동', '번지', '호', '층']
     candidates = [
         text for text in all_texts
@@ -278,35 +281,21 @@ def get_place_address(driver, name):
         driver.switch_to.frame(entry_iframe)
         time.sleep(3)
         addr_selectors = [
-            "span.LDgIH, div.LDgIH",
-            "span.address, div.address",
-            "span[class*='address']",
-            "div[class*='address']",
-            "span[class*='addr']",
-            "div[class*='addr']",
-            "span[class*='location']",
-            "div[class*='location']",
-            "span[class*='place']",
-            "div[class*='place']"
+            "div.nQ7Lh",
+            "span.LDgIH"
         ]
         addr = extract_address(driver, addr_selectors, name)
     except Exception as e:
         print(f"[{name}] entryIframe 진입 실패: {e}")
         try:
             time.sleep(3)
+            # 주소 요소가 뜰 때까지 명시적으로 기다림
+            WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "span.LDgIH"))
+            )
             addr_selectors_main = [
-                "span.LDgIH, div.LDgIH",
-                "span.address, div.address",
-                "span[class*='address']",
-                "div[class*='address']",
-                "span[class*='addr']",
-                "div[class*='addr']",
-                "span[class*='location']",
-                "div[class*='location']",
-                "span[class*='place']",
-                "div[class*='place']",
-                "span[class*='info']",
-                "div[class*='info']"
+                "div.nQ7Lh",
+                "span.LDgIH"
             ]
             addr = extract_address(driver, addr_selectors_main, name)
         except Exception as e2:
@@ -315,12 +304,64 @@ def get_place_address(driver, name):
     return addr
 
 
+# 상세페이지(iframe)에서 평점/리뷰 추출
+
+def get_detail_rating_review(driver, name=None):
+    """
+    entryIframe에 진입해서 평점과 방문자/블로그 리뷰 수를 각각 추출한다.
+    반환값: (평점, 방문자 리뷰, 블로그 리뷰)
+    """
+    rating = "0.0"
+    visitor_review = 0
+    blog_review = 0
+    try:
+        entry_iframe = WebDriverWait(driver, 5).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "iframe#entryIframe"))
+        )
+        driver.switch_to.frame(entry_iframe)
+        time.sleep(2)
+        # 평점 추출
+        for sel in ["span.PXMot.LXIwF", "span.h69bs.orXYY", "span.rating", "div.ps-rating", "span[class*='rating']"]:
+            try:
+                rating_elems = driver.find_elements(By.CSS_SELECTOR, sel)
+                for elem in rating_elems:
+                    text = elem.text.strip()
+                    m = re.search(r"([0-9]+\.[0-9]+)", text)
+                    if m:
+                        rating = m.group(1)
+                        break
+                if rating != "0.0":
+                    break
+            except:
+                continue
+        # 방문자/블로그 리뷰 분리 추출
+        try:
+            review_spans = driver.find_elements(By.CSS_SELECTOR, "div.dAsGb span.PXMot")
+            for span in review_spans:
+                text = span.text.strip().replace(',', '')
+                if "방문자 리뷰" in text:
+                    nums = re.findall(r'\d+', text)
+                    if nums:
+                        visitor_review = int(nums[0])
+                elif "블로그 리뷰" in text:
+                    nums = re.findall(r'\d+', text)
+                    if nums:
+                        blog_review = int(nums[0])
+        except Exception as e:
+            if name:
+                print(f"[{name}] 리뷰 분리 추출 실패: {e}")
+        driver.switch_to.default_content()
+    except Exception as e:
+        if name:
+            print(f"[{name}] 상세페이지 평점/리뷰 추출 실패: {e}")
+    return rating, visitor_review, blog_review
 
 
 
 if __name__ == "__main__":
     print("\n[네이버 지도 카페 수집기]")
     print("동 이름을 입력하면 카페를 검색, 수집합니다.")
+    print("종료하려면 [exit, quit, q, 종료] 입력하세요")
     
     # 동 이름 입력받기
     dong_name = input("\n수집할 지역 이름을 입력하세요(동 단위): ").strip()
@@ -345,11 +386,12 @@ if __name__ == "__main__":
         results = crawl_naver_cafes_by_dong(dong_name, max_count=max_count)
         if results:
             df = pd.DataFrame(results)
-            # 'review_count' 컬럼에서 '999+'를 999로 변환
-            df['review_count'] = df['review_count'].replace('999+', 999)
-            df['review_count'] = pd.to_numeric(df['review_count'])
+            df['visitor_review'] = pd.to_numeric(df['visitor_review'], errors='coerce')
+            df['visitor_review'] = df['visitor_review'].fillna(0).astype(int)
+            df['blog_review'] = pd.to_numeric(df['blog_review'], errors='coerce')
+            df['blog_review'] = df['blog_review'].fillna(0).astype(int)
             print(f"\n[{dong_name}] 카페 리스트 (총 {len(df)}개):")
-            print(df[['name', 'address', 'rating', 'review_count']].to_string(index=False))
+            print(df[['name', 'address', 'rating', 'visitor_review', 'blog_review']].to_string(index=False))
             # 파일 저장: dong 컬럼 제외
             save_cols = [col for col in df.columns if col != 'dong']
             filename = f"{dong_name}_카페리스트.csv"
