@@ -52,7 +52,7 @@ def crawl_naver_cafes(region_name, max_count=10):
     search_box.clear()
     search_box.send_keys(f"{region_name} 카페")
     search_box.send_keys("\n")
-    print(f"'{region_name} 카페' 검색어 입력 완료")
+    print(f"[{region_name} 카페] 검색어 입력")
 
     time.sleep(8)
 
@@ -70,24 +70,21 @@ def crawl_naver_cafes(region_name, max_count=10):
         return []
 
     # 장소 리스트 찾기
-    place_selectors = [
-        "li.UEzoS",
-        "li.VLTHu",
-        "div.place-list-item",
-        "li[data-laim-item-id]",
-        "div[data-laim-item-id]"
+    place_selector = [
+        "li.UEzoS"
     ]
 
     used_selector = None
     places = []
     
-    for selector in place_selectors:
+    for selector in place_selector:
         try:
             places = driver.find_elements(By.CSS_SELECTOR, selector)
 
             if len(places) > 0:
                 used_selector = selector
-                print(f"장소 리스트 셀렉터: {selector}, 개수: {len(places)}")
+                # print(f"장소 리스트 셀렉터: {selector}, 개수: {len(places)}")
+                print("장소 리스트 불러오기 성공")
                 break
 
         except:
@@ -186,7 +183,7 @@ def click_place_card(driver, place, name=None):
     name: (선택) 디버깅용 이름
     반환값: 클릭 성공 여부(bool)
     """
-    for click_sel in [".header_text_area", ".btn_place_card", "a.place_bluelink"]:
+    for click_sel in ["a.place_bluelink"]:
         try:
             click_elem = place.find_element(By.CSS_SELECTOR, click_sel)
             driver.execute_script("arguments[0].scrollIntoView(true);", click_elem)
@@ -196,7 +193,7 @@ def click_place_card(driver, place, name=None):
             driver.execute_script("arguments[0].click();", click_elem)
 
             if name:
-                print(f"[{name}] 상세페이지 클릭 성공 ({click_sel})")
+                print(f"\n[{name}] 상세페이지 클릭 성공")
 
             time.sleep(3)
 
@@ -284,14 +281,13 @@ def extract_address(driver, selectors, name=None):
 
             if addr_elems:
                 if name:
-                    print(f"[{name}] 주소 선택자 성공: {selector}")
+                    print(f"[{name}] 주소 태그 발견")
                 break
 
         except:
             continue
 
     all_texts = [elem.text.strip() for elem in addr_elems if elem.text.strip()]
-    print(f"[{name}] 주소 후보 텍스트: {all_texts}")
     address_keywords = ['구', '로', '길', '동', '번지', '호', '층']
     candidates = [
         clean_address(text)
@@ -305,7 +301,7 @@ def extract_address(driver, selectors, name=None):
         addr = max(candidates, key=len, default="")
 
         if name:
-            print(f"[{name}] 주소 최종 선택: {addr}")
+            print(f"[{name}] 주소 추출 성공: {addr}")
 
         return addr
 
@@ -331,7 +327,6 @@ def get_place_address(driver, name):
         driver.switch_to.frame(entry_iframe)
         time.sleep(3)
         addr_selectors = [
-            "div.nQ7Lh",
             "span.LDgIH"
         ]
         addr = extract_address(driver, addr_selectors, name)
@@ -466,7 +461,7 @@ if __name__ == "__main__":
 
     max_count = int(max_count_input)
 
-    print(f"\n[{region_name}] 카페 정보 수집 중...")
+    print(f"\n[{region_name}] 카페 정보 수집 시작")
 
     try:
         results = crawl_naver_cafes(region_name, max_count=max_count)
@@ -477,7 +472,7 @@ if __name__ == "__main__":
             df['visitor_review'] = df['visitor_review'].fillna(0).astype(int)
             df['blog_review'] = pd.to_numeric(df['blog_review'], errors='coerce')
             df['blog_review'] = df['blog_review'].fillna(0).astype(int)
-            print(f"\n[{region_name}] 카페 리스트 (총 {len(df)}개):")
+            print(f"\n[{region_name}] 카페 리스트 (총 {len(df)}개): \n")
             print(df[['name', 'address', 'visitor_review', 'blog_review']].to_string(index=False))
 
             # 파일 저장: region 컬럼 제외
