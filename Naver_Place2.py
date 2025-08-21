@@ -69,28 +69,19 @@ def crawl_naver_cafes(region_name, max_count=10):
         driver.quit()
         return []
 
-    # 장소 리스트 찾기
-    place_selector = [
-        "li.UEzoS"
-    ]
+    # 장소 찾기
+    place_selector = "li.UEzoS"
 
     used_selector = None
     places = []
     
-    for selector in place_selector:
-        try:
-            places = driver.find_elements(By.CSS_SELECTOR, selector)
+    try:
+        places = driver.find_elements(By.CSS_SELECTOR, place_selector)
+        if places:
+            used_selector = place_selector
+            print("장소 리스트 불러오기 성공")
 
-            if len(places) > 0:
-                used_selector = selector
-                # print(f"장소 리스트 셀렉터: {selector}, 개수: {len(places)}")
-                print("장소 리스트 불러오기 성공")
-                break
-
-        except:
-            continue
-
-    if not places:
+    except:
         print("장소 리스트를 찾지 못했습니다.")
         driver.quit()
         return []
@@ -209,14 +200,14 @@ def click_place_card(driver, place, name=None):
     return False
 
 
-
+'''
 # 리뷰수 추출
 def extract_review_count(place):
-    """
+    
     여러 selector를 시도하여 리뷰 수를 추출
     place: selenium element
     반환값: 리뷰 수 문자열(없으면 '0')
-    """
+    
     for sel in ["span.h69bs", "span.review_count", "div.ps-review", "span[class*='review']"]:
         try:
             review_elems = place.find_elements(By.CSS_SELECTOR, sel)
@@ -238,8 +229,7 @@ def extract_review_count(place):
             continue
 
     return "0"
-
-
+'''
 
 # '서울 OO구' 제거
 def clean_address(text):
