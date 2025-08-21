@@ -1,3 +1,4 @@
+from numpy import False_
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
@@ -200,36 +201,6 @@ def click_place_card(driver, place, name=None):
     return False
 
 
-'''
-# 리뷰수 추출
-def extract_review_count(place):
-    
-    여러 selector를 시도하여 리뷰 수를 추출
-    place: selenium element
-    반환값: 리뷰 수 문자열(없으면 '0')
-    
-    for sel in ["span.h69bs", "span.review_count", "div.ps-review", "span[class*='review']"]:
-        try:
-            review_elems = place.find_elements(By.CSS_SELECTOR, sel)
-
-            for elem in review_elems:
-                text = elem.text.strip()
-
-                if "리뷰" in text and "별점" not in text:
-                    if "+" in text:
-                        return "999+"
-
-                    else:
-                        nums = re.findall(r'\d+', text)
-
-                        if nums:
-                            return nums[0]
-
-        except:
-            continue
-
-    return "0"
-'''
 
 # '서울 OO구' 제거
 def clean_address(text):
@@ -394,36 +365,6 @@ def get_detail_review(driver, name=None):
 
     return visitor_review, blog_review
     
-
-
-    # 기존 평점 추출 코드
-    # 평점이 표시되지 않는 일이 빈번하게 일어나 삭제
-    #
-    # 1. get_detail_rating_review 함수 내 평점 추출
-    # try:
-    #     for sel in [
-    #         "span.PXMot.LXIwF", "span.h69bs.orXYY", "span.rating", "div.ps-rating",
-    #         "span[class*='rating']", "span.PXMot", "span[class*='PXMot']", "span[aria-label*='별점']"
-    #     ]:
-    #         rating_elems = driver.find_elements(By.CSS_SELECTOR, sel)
-    #         for elem in rating_elems:
-    #             text = elem.text.strip()
-    #             m = re.search(r"([0-9]+\\.[0-9]+)", text)
-    #             if m:
-    #                 rating = m.group(1)
-    #                 break
-    #         if rating != "0.0":
-    #             break
-    # except Exception as e:
-    #     if name:
-    #         print(f"[{name}] 평점 추출 실패: {e}")
-    #
-    # 2. results.append에 'rating' 추가
-    # "rating": rating,
-    #
-    # 3. DataFrame 출력/저장에 'rating' 컬럼 포함
-    # print(df[['name', 'address', 'rating', 'visitor_review', 'blog_review']].to_string(index=False))
-
 
 
 if __name__ == "__main__":
